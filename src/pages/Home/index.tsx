@@ -1,8 +1,9 @@
 import { Play } from "phosphor-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as zod from "zod";
+import {differenceInSeconds} from 'date-fns'
 import {
   CountdownContainer,
   FormContainer,
@@ -27,6 +28,7 @@ interface ICycle {
   id: string;
   task:string;
   minutesAmount:number;
+  startDate: Date
 }
 
 export function Home() {
@@ -50,6 +52,7 @@ const id = String(new Date().getTime())
       id,
       task:data.task,
       minutesAmount:data.minutesAmount,
+      startDate:new Date()
     }
 
     setCycles((state) => [...state, newCycle])//coloquei colchetes pq é um array de ciclos, e para adicionar um novo ciclo é necessario os tres pontos para que usem os possiveis ciclos anteriores e depois crie um novo com o newCycle
@@ -60,6 +63,14 @@ const id = String(new Date().getTime())
   }
 const activeCycles = cycles.find((cycle) => cycle.id===activeCycleId)
 console.log(activeCycles)
+
+useEffect(() => {
+  if(activeCycles) {
+    setInterval(() => {
+      setAmountSecondsPassed(differenceInSeconds(new Date(),activeCycles.startDate))
+    })
+  }
+},[activeCycles])
 
 const TotalSeconds = activeCycles? activeCycles.minutesAmount * 60: 0;
 const currentSeconds = activeCycles?TotalSeconds-amountSecondsPassed:0;
