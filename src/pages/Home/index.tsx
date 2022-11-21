@@ -1,42 +1,51 @@
-import { Play } from "phosphor-react";
-import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { HandPalm, Play } from "phosphor-react";
+import { createContext, useState } from "react";
+import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as zod from "zod";
-import {differenceInSeconds} from 'date-fns'
-import {
-  CountdownContainer,
-  FormContainer,
-  HomeContainer,
-  MinutesAmountInput,
-  Separator,
-  StartCountdownButton,
-  TaskInput,
-} from "./styles";
 
+import {
+  HomeContainer,
+  StartCountdownButton,
+  StopCountdownButton,
+} from "./styles";
+import { NewCycleForm } from "./components/NewCycleForm";
+import { Countdown } from "./components/Countdown";
+
+interface ICycle {
+  id: string;
+  task: string;
+  minutesAmount: number;
+  startDate: Date;
+  interruptDate?: Date;
+  finishedDate?: Date;
+}
+interface ICyclesContextData {
+  activeCycles: ICycle | undefined;
+  activeCycleId: string | null;
+  markCurrentCycleAsFinished: () => void;
+  amountSecondsPassed: number;
+  setSecondsPassed: (seconds: number) => void;
+}
+
+export const CyclesContext = createContext({} as ICyclesContextData);
 const newCycleFormValidationSchema = zod.object({
   task: zod.string().min(1, "Tente mais tarde"),
   minutesAmount: zod
     .number()
-    .min(5, "o ciclo precisa ser até no minimo ate 5 minutos")
+    .min(1, "o ciclo precisa ser até no minimo ate 1 minutos")
     .max(60, "o ciclo precisa ser até no maximo 60 minutos"),
 });
 
 type INewCicleFormatData = zod.infer<typeof newCycleFormValidationSchema>;
 
-interface ICycle {
-  id: string;
-  task:string;
-  minutesAmount:number;
-  startDate: Date
-}
-
 export function Home() {
-const [cycles, setCycles] = useState<ICycle[]>([]) //estou dizendo que o estado vai armazenar uma lista de ciclos usando o termo <ICycle[]>
-const [activeCycleId, setActiveCycleId] = useState<string | null>(null)  
-const [amountSecondsPassed, setAmountSecondsPassed] = useState(0)
-//amountSecondsPassed = segundos que ja se passaram desde que o activeCycles foi ativado
-const { register, handleSubmit, watch, reset } = useForm<INewCicleFormatData>({
+  const [amountSecondsPassed, setAmountSecondsPassed] = useState(0);
+  //amountSecondsPassed = segundos que ja se passaram desde que o activeCycles foi ativado
+  const [cycles, setCycles] = useState<ICycle[]>([]); //estou dizendo que o estado vai armazenar uma lista de ciclos usando o termo <ICycle[]>
+  const [activeCycleId, setActiveCycleId] = useState<string | null>(null);
+
+  const newCycleForm = useForm<INewCicleFormatData>({
     resolver: zodResolver(newCycleFormValidationSchema),
 
     defaultValues: {
@@ -44,40 +53,55 @@ const { register, handleSubmit, watch, reset } = useForm<INewCicleFormatData>({
       minutesAmount: 0,
     },
   });
+  const { handleSubmit, watch, reset } = newCycleForm;
+  function setSecondsPassed(seconds: number) {
+    setAmountSecondsPassed(seconds);
+  }
+
+  function markCurrentCycleAsFinished() {
+    setCycles((state) =>
+      state.map((cycle) => {
+        if (cycle.id === activeCycleId) {
+          return { ...cycle, finishedDate: new Date() };
+        } else {
+          return cycle;
+        }
+      })
+    );
+  }
 
   function handleCreateNewCycle(data: INewCicleFormatData) {
-const id = String(new Date().getTime())
+    const id = String(new Date().getTime());
 
-    const newCycle:ICycle = {
+    const newCycle: ICycle = {
       id,
-      task:data.task,
-      minutesAmount:data.minutesAmount,
-      startDate:new Date()
-    }
+      task: data.task,
+      minutesAmount: data.minutesAmount,
+      startDate: new Date(),
+    };
 
-    setCycles((state) => [...state, newCycle])//coloquei colchetes pq é um array de ciclos, e para adicionar um novo ciclo é necessario os tres pontos para que usem os possiveis ciclos anteriores e depois crie um novo com o newCycle
+    setCycles((state) => [...state, newCycle]); //coloquei colchetes pq é um array de ciclos, e para adicionar um novo ciclo é necessario os tres pontos para que usem os possiveis ciclos anteriores e depois crie um novo com o newCycle
     //toda vez que eu estou alterando um estado, e esse estado depende da sua informação anterior, é bom o estado ser setado em formato de função, assim como esta a arrow function acima
-   //state = Estado atual ( poderia ser qualquer nome)
-   setActiveCycleId(id)
-    reset()
+    //state = Estado atual ( poderia ser qualquer nome)
+    setActiveCycleId(id);
+    setAmountSecondsPassed(0); // quando eu crio um novo ciclo, agora eu sempre volto a os segundos que se passaram para zero, para que o ciclo não comece de uma conta errada, do ciclo anterior
+    reset();
   }
-const activeCycles = cycles.find((cycle) => cycle.id===activeCycleId)
-console.log(activeCycles)
 
-useEffect(() => {
-  if(activeCycles) {
-    setInterval(() => {
-      setAmountSecondsPassed(differenceInSeconds(new Date(),activeCycles.startDate))
-    })
+  function handleInterruptCycle() {
+    setCycles((state) =>
+      state.map((cycle) => {
+        if (cycle.id === activeCycleId) {
+          return { ...cycle, interruptDate: new Date() };
+        } else {
+          return cycle;
+        }
+      })
+    );
+    setActiveCycleId(null);
   }
-},[activeCycles])
+  const activeCycles = cycles.find((cycle) => cycle.id === activeCycleId);
 
-const TotalSeconds = activeCycles? activeCycles.minutesAmount * 60: 0;
-const currentSeconds = activeCycles?TotalSeconds-amountSecondsPassed:0;
-const minutesAmount = Math.floor(currentSeconds /60);
-const secondsAmount = currentSeconds%60;
-const minutes = String(minutesAmount).padStart(2,'0');
-const seconds = String(secondsAmount).padStart(2,'0');
   const task = watch("task");
 
   const isSubmitDisable = !task;
@@ -85,47 +109,30 @@ const seconds = String(secondsAmount).padStart(2,'0');
   return (
     <HomeContainer>
       <form action="" onSubmit={handleSubmit(handleCreateNewCycle)}>
-        <FormContainer>
-          <label htmlFor="task">Vou trabalhar em</label>
-          <TaskInput
-            id="task"
-            list="taskSugestions"
-            placeholder="Dê um nome para o seu projeto"
-            {...register("task")}
-          />
+        <CyclesContext.Provider
+          value={{
+            activeCycles,
+            activeCycleId,
+            markCurrentCycleAsFinished,
+            amountSecondsPassed,
+            setSecondsPassed,
+          }}
+        >
+          <FormProvider {...newCycleForm}>
+            <NewCycleForm />
+          </FormProvider>
 
-          <datalist id="taskSugestions">
-            <option value="Projeto1" />
-            <option value="Projeto1" />
-            <option value="Projeto1" />
-            <option value="Projeto1" />
-            <option value="Olas" />
-          </datalist>
-
-          <label htmlFor="minutesAmount">durante</label>
-          <MinutesAmountInput
-            id="minutesAmount"
-            placeholder="00"
-            type="number"
-            step={5}
-            max={60}
-            {...register("minutesAmount", { valueAsNumber: true })}
-          />
-
-          <span>minutos.</span>
-        </FormContainer>
-
-        <CountdownContainer>
-          <span>{minutes[0]}</span>
-          <span>{minutes[1]}</span>
-          <Separator>:</Separator>
-          <span>{seconds[0]}</span>
-          <span>{seconds[1]}</span>
-        </CountdownContainer>
-
-        <StartCountdownButton disabled={isSubmitDisable} type="submit">
-          <Play size={24} /> Começar
-        </StartCountdownButton>
+          <Countdown />
+          {activeCycles ? (
+            <StopCountdownButton onClick={handleInterruptCycle} type="button">
+              <HandPalm size={24} /> Interromper
+            </StopCountdownButton>
+          ) : (
+            <StartCountdownButton disabled={isSubmitDisable} type="submit">
+              <Play size={24} /> Começar
+            </StartCountdownButton>
+          )}
+        </CyclesContext.Provider>
       </form>
     </HomeContainer>
   );
