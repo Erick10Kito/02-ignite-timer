@@ -69,7 +69,6 @@ export function CyclesContextProvider({
     //state = Estado atual ( poderia ser qualquer nome)
     setActiveCycleId(id);
     setAmountSecondsPassed(0); // quando eu crio um novo ciclo, agora eu sempre volto a os segundos que se passaram para zero, para que o ciclo não comece de uma conta errada, do ciclo anterior
-    // reset();
   }
 
   function interruptCurrentCycle() {
