@@ -33,22 +33,53 @@ interface ICyclesContextProviderProps {
 //   };
 // }
 
+interface ICycleState {
+  cycles: ICycle[];
+  activeCycleId: string | null;
+}
+
 export const CyclesContext = createContext({} as ICyclesContextData);
 
 export function CyclesContextProvider({
   children,
 }: ICyclesContextProviderProps) {
+  const [cyclesState, dispatch] = useReducer(
+    (state: ICycleState, action: any) => {
+      if (action.type === "ADD_NEW_CYCLE") {
+        return {
+          ...state,
+          cycles: [...state.cycles, action.payload.newCycle],
+          activeCycleId: action.payload.newCycle.id,
+        };
+      }
+
+      if (action.type === "INTERRUPT_CURRENT_CYCLE") {
+        return {
+          ...state,
+          cycles: state.cycles.map((cycle) => {
+            if (cycle.id === state.activeCycleId) {
+              return { ...cycle, interruptDate: new Date() };
+            } else {
+              return cycle;
+            }
+          }),
+          activeCycleId: null,
+        };
+      }
+      return state;
+    },
+    {
+      cycles: [],
+      activeCycleId: null,
+    }
+  );
+
   const [amountSecondsPassed, setAmountSecondsPassed] = useState(0);
   //amountSecondsPassed = segundos que ja se passaram desde que o activeCycles foi ativado
-  const [cycles, dispatch] = useReducer((state: ICycle[], action: any) => {
-    if (action.type === "ADD_NEW_CYCLE") {
-      console.log(action);
-      return [...state, action.payload.data];
-    }
-    return state;
-  }, []);
+
+  const { cycles, activeCycleId } = cyclesState;
+
   // const [cycles, setCycles] = useState<ICycle[]>([]); //estou dizendo que o estado vai armazenar uma lista de ciclos usando o termo <ICycle[]>
-  const [activeCycleId, setActiveCycleId] = useState<string | null>(null);
 
   const activeCycles = cycles.find((cycle) => cycle.id === activeCycleId);
 
@@ -87,14 +118,14 @@ export function CyclesContextProvider({
     dispatch({
       type: "ADD_NEW_CYCLE",
       payload: {
-        data: newCycle,
+        newCycle,
       },
     });
 
     // setCycles((state) => [...state, newCycle]); //coloquei colchetes pq é um array de ciclos, e para adicionar um novo ciclo é necessario os tres pontos para que usem os possiveis ciclos anteriores e depois crie um novo com o newCycle
     //toda vez que eu estou alterando um estado, e esse estado depende da sua informação anterior, é bom o estado ser setado em formato de função, assim como esta a arrow function acima
     //state = Estado atual ( poderia ser qualquer nome)
-    setActiveCycleId(id);
+
     setAmountSecondsPassed(0); // quando eu crio um novo ciclo, agora eu sempre volto a os segundos que se passaram para zero, para que o ciclo não comece de uma conta errada, do ciclo anterior
   }
 
@@ -105,16 +136,6 @@ export function CyclesContextProvider({
         data: activeCycleId,
       },
     });
-    // setCycles((state) =>
-    //   state.map((cycle) => {
-    //     if (cycle.id === activeCycleId) {
-    //       return { ...cycle, interruptDate: new Date() };
-    //     } else {
-    //       return cycle;
-    //     }
-    //   })
-    // );
-    setActiveCycleId(null);
   }
   return (
     <CyclesContext.Provider
