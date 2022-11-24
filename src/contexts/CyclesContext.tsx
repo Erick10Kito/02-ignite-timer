@@ -1,5 +1,17 @@
-import { createContext, ReactNode, useReducer, useState } from "react";
-import { ActionTypes, cyclesReducer, ICycle } from "../reducers/cycles";
+import {
+  createContext,
+  ReactNode,
+  useEffect,
+  useReducer,
+  useState,
+} from "react";
+import { cyclesReducer, ICycle } from "../reducers/cycles/reducer";
+import {
+  addNewCycleAction,
+  interruptCurrentCycleAction,
+  markCurrentCycleAsFinishedAction,
+} from "../reducers/cycles/actions";
+import { differenceInSeconds } from "date-fns";
 interface ICreateCycleData {
   task: string;
   minutesAmount: number;
@@ -31,31 +43,47 @@ export const CyclesContext = createContext({} as ICyclesContextData);
 export function CyclesContextProvider({
   children,
 }: ICyclesContextProviderProps) {
-  const [cyclesState, dispatch] = useReducer(cyclesReducer, {
-    cycles: [],
-    activeCycleId: null,
-  });
+  const [cyclesState, dispatch] = useReducer(
+    cyclesReducer,
+    {
+      cycles: [],
+      activeCycleId: null,
+    },
+    () => {
+      const storedStateAsJSON = localStorage.getItem(
+        "@ignite-timer:cycles-state-1.0.0EI"
+      );
 
-  const [amountSecondsPassed, setAmountSecondsPassed] = useState(0);
+      if (storedStateAsJSON) {
+        return JSON.parse(storedStateAsJSON);
+      }
+    }
+  );
+  const { cycles, activeCycleId } = cyclesState;
+  const activeCycles = cycles.find((cycle) => cycle.id === activeCycleId);
+
+  const [amountSecondsPassed, setAmountSecondsPassed] = useState(() => {
+    if (activeCycles) {
+      return differenceInSeconds(new Date(), new Date(activeCycles.startDate));
+    }
+    return 0;
+  });
   //amountSecondsPassed = segundos que ja se passaram desde que o activeCycles foi ativado
 
-  const { cycles, activeCycleId } = cyclesState;
+  useEffect(() => {
+    const stateJSON = JSON.stringify(cyclesState);
+
+    localStorage.setItem("@ignite-timer:cycles-state-1.0.0EI", stateJSON);
+  }, [cyclesState]);
 
   // const [cycles, setCycles] = useState<ICycle[]>([]); //estou dizendo que o estado vai armazenar uma lista de ciclos usando o termo <ICycle[]>
-
-  const activeCycles = cycles.find((cycle) => cycle.id === activeCycleId);
 
   function setSecondsPassed(seconds: number) {
     setAmountSecondsPassed(seconds);
   }
 
   function markCurrentCycleAsFinished() {
-    dispatch({
-      type: ActionTypes.MARK_CURRENT_CYCLE_AS_FINISHED,
-      payload: {
-        data: activeCycleId,
-      },
-    });
+    dispatch(markCurrentCycleAsFinishedAction());
     // setCycles((state) =>
     //   state.map((cycle) => {
     //     if (cycle.id === activeCycleId) {
@@ -77,12 +105,7 @@ export function CyclesContextProvider({
       startDate: new Date(),
     };
 
-    dispatch({
-      type: ActionTypes.ADD_NEW_CYCLE,
-      payload: {
-        newCycle,
-      },
-    });
+    dispatch(addNewCycleAction(newCycle));
 
     // setCycles((state) => [...state, newCycle]); //coloquei colchetes pq é um array de ciclos, e para adicionar um novo ciclo é necessario os tres pontos para que usem os possiveis ciclos anteriores e depois crie um novo com o newCycle
     //toda vez que eu estou alterando um estado, e esse estado depende da sua informação anterior, é bom o estado ser setado em formato de função, assim como esta a arrow function acima
@@ -92,12 +115,7 @@ export function CyclesContextProvider({
   }
 
   function interruptCurrentCycle() {
-    dispatch({
-      type: ActionTypes.INTERRUPT_CURRENT_CYCLE,
-      payload: {
-        data: activeCycleId,
-      },
-    });
+    dispatch(interruptCurrentCycleAction());
   }
   return (
     <CyclesContext.Provider
